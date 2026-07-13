@@ -45,6 +45,8 @@ services:
     restart: unless-stopped
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env.production}
+      SECONDARY_DOMAIN: ${SECONDARY_DOMAIN:-secondary.invalid}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set PUBLIC_BASE_URL in .env.production}
     ports:
       - "80:80"
       - "443:443"

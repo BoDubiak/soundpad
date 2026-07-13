@@ -75,7 +75,8 @@ cp .env.production.example .env.production
 nano .env.production
 ```
 
-Set `SITE_ADDRESS` to the hostname without a scheme and set `PUBLIC_BASE_URL` to its HTTPS URL. Generate two different secrets:
+Set `SITE_ADDRESS` to the hostname list without a scheme, set `SECONDARY_DOMAIN` to the `www` hostname, and set
+`PUBLIC_BASE_URL` to the canonical HTTPS URL. Generate two different secrets:
 
 ```bash
 openssl rand -hex 32

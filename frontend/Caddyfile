@@ -1,6 +1,9 @@
 {$SITE_ADDRESS} {
 	encode zstd gzip
 
+	@secondary host {$SECONDARY_DOMAIN:secondary.invalid}
+	redir @secondary {$PUBLIC_BASE_URL}{uri} permanent
+
 	handle_path /api/* {
 		reverse_proxy backend:8000
 	}
