@@ -82,6 +82,7 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/soundpad_deploy
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/soundpad_deploy ~/.ssh/known_hosts
+          ssh-keygen -lf ~/.ssh/soundpad_deploy
 
       - name: Upload application
         run: |
@@ -94,16 +95,16 @@ jobs:
             --exclude backend/uploads/ \
             --exclude frontend/node_modules/ \
             --exclude frontend/dist/ \
-            -e "ssh -i ~/.ssh/soundpad_deploy" \
+            -e "ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/soundpad_deploy" \
             ./ "$DEPLOY_USER@$DEPLOY_HOST:/opt/soundpad/"
 
       - name: Rebuild and restart production
         run: |
-          ssh -i ~/.ssh/soundpad_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/soundpad_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
             'cd /opt/soundpad && docker compose -p soundpad --env-file .env.production -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 180'
 
       - name: Show service status
         if: always()
         run: |
-          ssh -i ~/.ssh/soundpad_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/soundpad_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
             'cd /opt/soundpad && docker compose -p soundpad --env-file .env.production -f docker-compose.prod.yml ps'
