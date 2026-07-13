@@ -1,5 +1,7 @@
+import asyncio
 import shutil
 import subprocess
+import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -58,13 +60,26 @@ app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads"
 
 
 @app.on_event("startup")
-def on_startup() -> None:
+async def on_startup() -> None:
+    cleanup_stale_youtube_sources()
     Base.metadata.create_all(bind=engine)
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE sounds ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
         connection.execute(text("ALTER TABLE soundboards ADD COLUMN IF NOT EXISTS owner_id UUID"))
         connection.execute(text("ALTER TABLE soundboards ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_soundboards_owner_id ON soundboards (owner_id)"))
+    app.state.youtube_cleanup_task = asyncio.create_task(run_youtube_cleanup())
+
+
+@app.on_event("shutdown")
+async def on_shutdown() -> None:
+    cleanup_task = getattr(app.state, "youtube_cleanup_task", None)
+    if cleanup_task is not None:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
 
 
 def get_board_or_404(board_id: uuid.UUID, db: Session) -> Soundboard:
@@ -141,6 +156,29 @@ def get_youtube_source_path(source_id: uuid.UUID) -> Path | None:
         if path.is_file():
             return path
     return None
+
+
+def delete_youtube_source(source_id: uuid.UUID) -> None:
+    for path in youtube_dir.glob(f"{source_id}.*"):
+        if path.is_file():
+            path.unlink(missing_ok=True)
+
+
+def cleanup_stale_youtube_sources() -> None:
+    cutoff = time.time() - max(1, settings.youtube_temp_ttl_hours) * 60 * 60
+    for path in youtube_dir.iterdir():
+        try:
+            if path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            # Another request may have removed the same temporary file.
+            continue
+
+
+async def run_youtube_cleanup() -> None:
+    while True:
+        await asyncio.sleep(60 * 60)
+        cleanup_stale_youtube_sources()
 
 
 @app.get("/health")
@@ -410,6 +448,7 @@ def prepare_youtube_audio(
     user: User = Depends(get_current_user),
 ) -> YoutubePrepareResponse:
     _ = user
+    cleanup_stale_youtube_sources()
     try:
         from yt_dlp import YoutubeDL
     except ImportError as error:
@@ -439,6 +478,7 @@ def prepare_youtube_audio(
         ) as downloader:
             info = downloader.extract_info(payload.url.strip(), download=True)
     except Exception as error:
+        delete_youtube_source(source_id)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not download YouTube audio: {error}") from error
 
     audio_path = youtube_dir / f"{source_id}.mp3"
@@ -510,6 +550,7 @@ def add_youtube_clip(
     db.add(sound)
     db.commit()
     db.refresh(sound)
+    delete_youtube_source(payload.source_id)
     return sound
 
 

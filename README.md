@@ -47,6 +47,8 @@ npm run dev
 Frontend defaults to `http://localhost:5173`, backend to `http://localhost:8000`.
 
 For YouTube clips, install `ffmpeg` and make sure `ffmpeg`/`ffprobe` are available in `PATH`.
+Prepared YouTube source files are deleted after a clip is created. Abandoned source files are removed after
+`YOUTUBE_TEMP_TTL_HOURS` hours (24 by default) on backend startup, hourly, and before each new YouTube preparation.
 
 ## GitHub
 
@@ -89,3 +91,8 @@ Before publishing, set a real `JWT_SECRET_KEY` in deployment secrets instead of 
 - Audio preloading on the client
 - User accounts with email/password login
 - JWT access tokens with httpOnly refresh-token cookies
+
+## Deployment
+
+- OVH VPS setup: [`DEPLOY_OVH.md`](DEPLOY_OVH.md)
+- GitHub Actions CI/CD: [`CICD.md`](CICD.md)
