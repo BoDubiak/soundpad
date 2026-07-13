@@ -63,6 +63,9 @@ button:disabled {
 }
 
 .board-title-row {
+  align-items: center;
+  display: flex;
+  gap: clamp(14px, 2vw, 22px);
   min-width: 0;
 }
 
@@ -84,7 +87,7 @@ button:disabled {
   font-size: clamp(2rem, 6vw, 4.8rem);
   font-weight: 800;
   letter-spacing: 0;
-  max-width: min(72vw, 780px);
+  max-width: min(72vw, 900px);
   outline: none;
   padding: 0;
 }
@@ -104,18 +107,37 @@ button:disabled {
 }
 
 .board-cover-preview {
-  aspect-ratio: 16 / 6;
+  aspect-ratio: 1;
   background-position: center;
   background-size: cover;
   border: 1px solid #dfe5e8;
-  border-radius: 8px;
-  margin-top: 12px;
-  max-width: min(72vw, 780px);
-  min-height: 96px;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(16, 24, 29, 0.1);
+  flex: 0 0 clamp(96px, 10vw, 124px);
+  width: clamp(96px, 10vw, 124px);
 }
 
 .board-cover-preview.public-cover {
-  max-width: min(72vw, 780px);
+  flex-basis: clamp(80px, 9vw, 112px);
+  width: clamp(80px, 9vw, 112px);
+}
+
+.public-topbar {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.public-heading {
+  align-items: center;
+  display: flex;
+  gap: clamp(14px, 2vw, 20px);
+  min-width: 0;
+}
+
+.public-heading-copy {
+  min-width: 0;
 }
 
 .title-input:focus {
@@ -869,6 +891,22 @@ kbd {
   .title-display {
     max-width: 100%;
     width: 100%;
+  }
+
+  .board-cover-preview {
+    border-radius: 10px;
+    flex-basis: 72px;
+    width: 72px;
+  }
+
+  .board-cover-preview.public-cover {
+    flex-basis: 64px;
+    width: 64px;
+  }
+
+  .public-topbar {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .toolbar {

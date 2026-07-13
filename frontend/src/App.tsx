@@ -651,10 +651,14 @@ export function App() {
             </div>
           </div>
           <div className="board-title-row">
-            <h1 className="title-display">{titleDraft}</h1>
             {board?.image_url ? (
-              <div className="board-cover-preview" style={{ backgroundImage: `url("${board.image_url}")` }} />
+              <div
+                className="board-cover-preview"
+                style={{ backgroundImage: `url("${board.image_url}")` }}
+                aria-hidden="true"
+              />
             ) : null}
+            <h1 className="title-display">{titleDraft}</h1>
           </div>
         </div>
       </section>
@@ -1135,13 +1139,19 @@ function PublicBoard({
 
   return (
     <main className="app-shell">
-      <section className="topbar">
-        <div>
-          <p className="eyebrow">Soundpad</p>
+      <section className="topbar public-topbar">
+        <div className="public-heading">
           {board.image_url ? (
-            <div className="board-cover-preview public-cover" style={{ backgroundImage: `url("${board.image_url}")` }} />
+            <div
+              className="board-cover-preview public-cover"
+              style={{ backgroundImage: `url("${board.image_url}")` }}
+              aria-hidden="true"
+            />
           ) : null}
-          <h1 className="public-title">{board.title}</h1>
+          <div className="public-heading-copy">
+            <p className="eyebrow">Soundpad</p>
+            <h1 className="public-title">{board.title}</h1>
+          </div>
         </div>
         <div className="toolbar">
           <button className="primary-button" disabled={isSaving} onClick={handleSave}>
