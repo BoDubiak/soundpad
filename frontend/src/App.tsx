@@ -295,9 +295,9 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [editingSound, isAddPanelOpen, playSound, sortedSounds]);
 
-  const createAndSelectBoard = async (title: string) => {
+  const createAndSelectBoard = async (title: string, imageUrl?: string) => {
     setStatus("");
-    const nextBoard = await createBoard(title.trim() || "New Soundboard", boardImageDraft.trim() || undefined);
+    const nextBoard = await createBoard(title.trim() || "New Soundboard", imageUrl?.trim() || undefined);
     setBoard(nextBoard);
     setTitleDraft(nextBoard.title);
     setBoardImageDraft(nextBoard.image_url ?? "");
@@ -368,7 +368,7 @@ export function App() {
 
   const handleSaveTitle = async () => {
     if (!board) {
-      await createAndSelectBoard(titleDraft);
+      await createAndSelectBoard(titleDraft, boardImageDraft);
       return;
     }
     const nextBoard = await updateBoard(board.id, {
@@ -604,7 +604,10 @@ export function App() {
       <section className="topbar">
         <div className="board-heading">
           <div className="site-row">
-            <p className="eyebrow">Soundpad</p>
+            <a className="site-brand" href="/" aria-label="Soundpad home">
+              <img className="site-logo" src="/soundpad-logo.png" alt="" />
+              <span>Soundpad</span>
+            </a>
             <div className="toolbar topbar-actions">
               <span className="user-chip" title={user.email}>
                 <UserRound size={18} />
@@ -650,16 +653,6 @@ export function App() {
               </button>
             </div>
           </div>
-          <div className="board-title-row">
-            {board?.image_url ? (
-              <div
-                className="board-cover-preview"
-                style={{ backgroundImage: `url("${board.image_url}")` }}
-                aria-hidden="true"
-              />
-            ) : null}
-            <h1 className="title-display">{titleDraft}</h1>
-          </div>
         </div>
       </section>
 
@@ -697,7 +690,7 @@ export function App() {
                       >
                         {item.image_url ? null : item.title.slice(0, 1).toUpperCase()}
                       </span>
-                      <span>{item.title}</span>
+                      <span className="board-row-label" title={item.title}>{item.title}</span>
                     </span>
                     {isEditMode ? (
                       <button
@@ -743,7 +736,7 @@ export function App() {
                     >
                       {item.image_url ? null : item.title.slice(0, 1).toUpperCase()}
                     </span>
-                    <span>{item.title}</span>
+                    <span className="board-row-label" title={item.title}>{item.title}</span>
                   </span>
                   <small>{item.sounds.length} sounds - public</small>
                 </button>
@@ -753,6 +746,23 @@ export function App() {
         </aside>
 
         <section className="board-area">
+          <div className="board-title-row board-area-heading">
+            {board?.image_url ? (
+              <div
+                className="board-cover-preview"
+                style={{ backgroundImage: `url("${board.image_url}")` }}
+                aria-hidden="true"
+              />
+            ) : null}
+            <h1
+              className={`title-display ${
+                titleDraft.length > 52 ? "very-long-title" : titleDraft.length > 28 ? "long-title" : ""
+              }`}
+              title={titleDraft}
+            >
+              {titleDraft}
+            </h1>
+          </div>
           {status ? <p className="status board-status">{status}</p> : null}
           {isEditMode ? (
             <section className="board-settings-panel">
