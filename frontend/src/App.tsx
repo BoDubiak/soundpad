@@ -1,9 +1,10 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Globe2, Layers, Link, Lock, LogOut, Pause, Pencil, Play, Plus, Save, Search, Scissors, Trash2, Upload, UserRound, X, Youtube } from "lucide-react";
+import { Globe2, Layers, Link, LoaderCircle, Lock, LogOut, Pause, Pencil, Play, Plus, Save, Search, Scissors, Trash2, Upload, UserRound, X, Youtube } from "lucide-react";
 import {
   Sound,
   Soundboard,
   User,
+  YoutubeFrameOption,
   YoutubeSource,
   addSoundUrl,
   clipYoutubeSound,
@@ -15,6 +16,7 @@ import {
   getBoards,
   getCurrentUser,
   getPublicBoard,
+  generateYoutubeFrames,
   login,
   logout,
   reorderSounds,
@@ -47,9 +49,13 @@ export function App() {
   const [soundUrl, setSoundUrl] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [youtubeSource, setYoutubeSource] = useState<YoutubeSource | null>(null);
+  const [youtubeFrames, setYoutubeFrames] = useState<YoutubeFrameOption[]>([]);
+  const [selectedYoutubeFrame, setSelectedYoutubeFrame] = useState<number | null>(null);
   const [clipStart, setClipStart] = useState(0);
   const [clipDuration, setClipDuration] = useState(8);
   const [isPreparingYoutube, setIsPreparingYoutube] = useState(false);
+  const [isGeneratingYoutubeFrames, setIsGeneratingYoutubeFrames] = useState(false);
+  const [isAddingSound, setIsAddingSound] = useState(false);
   const [isPreviewingClip, setIsPreviewingClip] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [hotkey, setHotkey] = useState("");
@@ -381,11 +387,11 @@ export function App() {
     setStatus("Saved");
   };
 
-  const handleToggleVisibility = async () => {
-    if (!board) {
+  const handleSetVisibility = async (isPublic: boolean) => {
+    if (!board || board.is_public === isPublic) {
       return;
     }
-    const nextBoard = await updateBoard(board.id, { is_public: !board.is_public });
+    const nextBoard = await updateBoard(board.id, { is_public: isPublic });
     setBoard(nextBoard);
     await refreshBoards();
     setStatus(nextBoard.is_public ? "Board is public" : "Board is private");
@@ -401,6 +407,8 @@ export function App() {
     setStatus("");
     setIsPreparingYoutube(true);
     setYoutubeSource(null);
+    setYoutubeFrames([]);
+    setSelectedYoutubeFrame(null);
     try {
       const source = await prepareYoutubeSound(cleanedUrl);
       setYoutubeSource(source);
@@ -411,6 +419,25 @@ export function App() {
       setStatus(error instanceof Error ? error.message : "Could not prepare YouTube audio");
     } finally {
       setIsPreparingYoutube(false);
+    }
+  };
+
+  const handleGenerateYoutubeFrames = async () => {
+    if (!youtubeSource) {
+      return;
+    }
+    setStatus("");
+    setIsGeneratingYoutubeFrames(true);
+    setYoutubeFrames([]);
+    setSelectedYoutubeFrame(null);
+    try {
+      const result = await generateYoutubeFrames(youtubeSource.source_id, clipStart, clipDuration);
+      setYoutubeFrames(result.frames);
+      setSelectedYoutubeFrame(result.frames[0]?.index ?? null);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not generate YouTube frames");
+    } finally {
+      setIsGeneratingYoutubeFrames(false);
     }
   };
 
@@ -443,7 +470,12 @@ export function App() {
 
   const handleAddSound = async (event: FormEvent) => {
     event.preventDefault();
+    if (isAddingSound) {
+      return;
+    }
     setStatus("");
+    setIsAddingSound(true);
+    try {
     let activeBoard = board;
     if (!activeBoard) {
       activeBoard = await createBoard(titleDraft.trim() || "My Soundboard", boardImageDraft.trim() || undefined);
@@ -479,6 +511,7 @@ export function App() {
           start: clipStart,
           duration: clipDuration,
           ...(cleanedImageUrl ? { image_url: cleanedImageUrl } : {}),
+          ...(!cleanedImageUrl && selectedYoutubeFrame !== null ? { frame_index: selectedYoutubeFrame } : {}),
           hotkey: cleanedHotkey,
         });
       } else {
@@ -501,12 +534,19 @@ export function App() {
     setSoundUrl("");
     setYoutubeUrl("");
     setYoutubeSource(null);
+    setYoutubeFrames([]);
+    setSelectedYoutubeFrame(null);
     setClipStart(0);
     setClipDuration(8);
     setImageUrl("");
     setHotkey("");
     setFile(null);
     setIsAddPanelOpen(false);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not add the sound");
+    } finally {
+      setIsAddingSound(false);
+    }
   };
 
   const handleDelete = async (soundId: string) => {
@@ -616,38 +656,6 @@ export function App() {
               <button className="icon-button" onClick={board ? handleSaveTitle : handleCreateBoard} title="Save board">
                 <Save size={18} />
               </button>
-              <button
-                className={`icon-button ${isEditMode ? "active" : ""}`}
-                onClick={() => {
-                  setIsEditMode((current) => !current);
-                  setConfirmDeleteId(null);
-                  setConfirmDeleteBoardId(null);
-                }}
-                title={isEditMode ? "Exit edit mode" : "Edit board"}
-              >
-                <Pencil size={18} />
-              </button>
-              <button
-                className={`visibility-button ${board?.is_public ? "public" : "private"}`}
-                disabled={!board}
-                onClick={handleToggleVisibility}
-                title={board?.is_public ? "Make private" : "Make public"}
-              >
-                {board?.is_public ? <Globe2 size={18} /> : <Lock size={18} />}
-                {board?.is_public ? "Public" : "Private"}
-              </button>
-              <button
-                className="share-button"
-                disabled={!board || !board.is_public}
-                onClick={() => {
-                  navigator.clipboard.writeText(shareUrl);
-                  setStatus("Share link copied");
-                }}
-                title={board?.is_public ? "Copy public link" : "Make board public to share"}
-              >
-                <Link size={18} />
-                Share
-              </button>
               <button className="icon-button" onClick={handleLogout} title="Log out">
                 <LogOut size={18} />
               </button>
@@ -747,21 +755,58 @@ export function App() {
 
         <section className="board-area">
           <div className="board-title-row board-area-heading">
-            {board?.image_url ? (
-              <div
-                className="board-cover-preview"
-                style={{ backgroundImage: `url("${board.image_url}")` }}
-                aria-hidden="true"
-              />
-            ) : null}
-            <h1
-              className={`title-display ${
-                titleDraft.length > 52 ? "very-long-title" : titleDraft.length > 28 ? "long-title" : ""
-              }`}
-              title={titleDraft}
-            >
-              {titleDraft}
-            </h1>
+            <div className="board-heading-identity">
+              {board?.image_url ? (
+                <div
+                  className="board-cover-preview"
+                  style={{ backgroundImage: `url("${board.image_url}")` }}
+                  aria-hidden="true"
+                />
+              ) : null}
+              <h1
+                className={`title-display ${
+                  titleDraft.length > 52 ? "very-long-title" : titleDraft.length > 28 ? "long-title" : ""
+                }`}
+                title={titleDraft}
+              >
+                {titleDraft}
+              </h1>
+            </div>
+            <div className="toolbar board-area-actions">
+              <button
+                className={`icon-button ${isEditMode ? "active" : ""}`}
+                onClick={() => {
+                  setIsEditMode((current) => !current);
+                  setConfirmDeleteId(null);
+                  setConfirmDeleteBoardId(null);
+                }}
+                title={isEditMode ? "Exit edit mode" : "Edit board"}
+              >
+                <Pencil size={18} />
+                {isEditMode ? "Done" : "Edit"}
+              </button>
+              {board ? (
+                <span
+                  className={`visibility-status ${board.is_public ? "public" : "private"}`}
+                  title={board.is_public ? "This board is public" : "This board is private"}
+                >
+                  {board.is_public ? <Globe2 size={18} /> : <Lock size={18} />}
+                  {board.is_public ? "Public" : "Private"}
+                </span>
+              ) : null}
+              <button
+                className="share-button"
+                disabled={!board || !board.is_public}
+                onClick={() => {
+                  navigator.clipboard.writeText(shareUrl);
+                  setStatus("Share link copied");
+                }}
+                title={board?.is_public ? "Copy public link" : "Make board public to share"}
+              >
+                <Link size={18} />
+                Share
+              </button>
+            </div>
           </div>
           {status ? <p className="status board-status">{status}</p> : null}
           {isEditMode ? (
@@ -781,6 +826,17 @@ export function App() {
                   onChange={(event) => setBoardImageDraft(event.target.value)}
                   placeholder="https://example.com/cover.jpg"
                 />
+              </label>
+              <label>
+                Visibility
+                <select
+                  value={board?.is_public ? "public" : "private"}
+                  disabled={!board}
+                  onChange={(event) => handleSetVisibility(event.target.value === "public")}
+                >
+                  <option value="private">Private</option>
+                  <option value="public">Public</option>
+                </select>
               </label>
             </section>
           ) : null}
@@ -916,6 +972,8 @@ export function App() {
                       onChange={(event) => {
                         setYoutubeUrl(event.target.value);
                         setYoutubeSource(null);
+                        setYoutubeFrames([]);
+                        setSelectedYoutubeFrame(null);
                       }}
                       placeholder="https://www.youtube.com/watch?v=..."
                     />
@@ -926,7 +984,7 @@ export function App() {
                     onClick={handlePrepareYoutube}
                     type="button"
                   >
-                    <Youtube size={18} />
+                    {isPreparingYoutube ? <LoaderCircle className="button-spinner" size={18} /> : <Youtube size={18} />}
                     {isPreparingYoutube ? "Preparing..." : "Prepare audio"}
                   </button>
                   {youtubeSource ? (
@@ -944,6 +1002,8 @@ export function App() {
                             const nextStart = Number(event.target.value);
                             setClipStart(nextStart);
                             setClipDuration((current) => Math.min(current, Math.max(1, youtubeSource.duration - nextStart)));
+                            setYoutubeFrames([]);
+                            setSelectedYoutubeFrame(null);
                           }}
                           step={0.1}
                           type="range"
@@ -955,7 +1015,11 @@ export function App() {
                         <input
                           max={Math.min(60, Math.max(1, youtubeSource.duration - clipStart))}
                           min={1}
-                          onChange={(event) => setClipDuration(Number(event.target.value))}
+                          onChange={(event) => {
+                            setClipDuration(Number(event.target.value));
+                            setYoutubeFrames([]);
+                            setSelectedYoutubeFrame(null);
+                          }}
                           step={0.1}
                           type="range"
                           value={clipDuration}
@@ -966,7 +1030,11 @@ export function App() {
                           aria-label="Clip start seconds"
                           min={0}
                           max={Math.max(0, youtubeSource.duration - 1)}
-                          onChange={(event) => setClipStart(Number(event.target.value))}
+                          onChange={(event) => {
+                            setClipStart(Number(event.target.value));
+                            setYoutubeFrames([]);
+                            setSelectedYoutubeFrame(null);
+                          }}
                           step={0.1}
                           type="number"
                           value={clipStart}
@@ -975,7 +1043,11 @@ export function App() {
                           aria-label="Clip duration seconds"
                           min={1}
                           max={60}
-                          onChange={(event) => setClipDuration(Number(event.target.value))}
+                          onChange={(event) => {
+                            setClipDuration(Number(event.target.value));
+                            setYoutubeFrames([]);
+                            setSelectedYoutubeFrame(null);
+                          }}
                           step={0.1}
                           type="number"
                           value={clipDuration}
@@ -985,13 +1057,54 @@ export function App() {
                           Preview
                         </button>
                       </div>
+                      <button
+                        className="secondary-button"
+                        disabled={isGeneratingYoutubeFrames}
+                        onClick={handleGenerateYoutubeFrames}
+                        type="button"
+                      >
+                        {isGeneratingYoutubeFrames ? (
+                          <LoaderCircle className="button-spinner" size={18} />
+                        ) : (
+                          <Scissors size={18} />
+                        )}
+                        {isGeneratingYoutubeFrames ? "Generating frames..." : "Choose a frame"}
+                      </button>
+                      {youtubeFrames.length > 0 ? (
+                        <div className="youtube-frame-grid" aria-label="Choose a button image">
+                          {youtubeFrames.map((frame) => (
+                            <button
+                              aria-pressed={selectedYoutubeFrame === frame.index}
+                              className={`youtube-frame-option ${selectedYoutubeFrame === frame.index ? "selected" : ""}`}
+                              key={frame.index}
+                              onClick={() => setSelectedYoutubeFrame(frame.index)}
+                              type="button"
+                            >
+                              <img src={frame.image_url} alt={`Frame at ${formatSeconds(frame.timestamp)}`} />
+                              <span>{formatSeconds(frame.timestamp)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
               )}
-              <button className="primary-button" type="submit">
-                {mode === "youtube" ? <Scissors size={18} /> : <Plus size={18} />}
-                {mode === "youtube" ? "Create clip" : "Add button"}
+              <button className="primary-button" disabled={isAddingSound} type="submit">
+                {isAddingSound ? (
+                  <LoaderCircle className="button-spinner" size={18} />
+                ) : mode === "youtube" ? (
+                  <Scissors size={18} />
+                ) : (
+                  <Plus size={18} />
+                )}
+                {isAddingSound
+                  ? mode === "youtube"
+                    ? "Creating clip..."
+                    : "Adding..."
+                  : mode === "youtube"
+                    ? "Create clip"
+                    : "Add button"}
               </button>
             </form>
 

@@ -38,6 +38,12 @@ export type YoutubeSource = {
   audio_url: string;
 };
 
+export type YoutubeFrameOption = {
+  index: number;
+  timestamp: number;
+  image_url: string;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const ACCESS_TOKEN_KEY = "soundpad.accessToken";
 
@@ -212,6 +218,14 @@ export function prepareYoutubeSound(url: string) {
   });
 }
 
+export function generateYoutubeFrames(sourceId: string, start: number, duration: number) {
+  return request<{ frames: YoutubeFrameOption[] }>("/youtube/frames", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source_id: sourceId, start, duration }),
+  });
+}
+
 export function clipYoutubeSound(
   boardId: string,
   data: {
@@ -220,6 +234,7 @@ export function clipYoutubeSound(
     start: number;
     duration: number;
     image_url?: string;
+    frame_index?: number;
     hotkey?: string;
   },
 ) {

@@ -1,6 +1,8 @@
 import asyncio
+import json
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 from datetime import UTC, datetime
@@ -39,6 +41,9 @@ from app.schemas import (
     UserCreate,
     UserRead,
     YoutubeClipRequest,
+    YoutubeFrameOption,
+    YoutubeFramesRequest,
+    YoutubeFramesResponse,
     YoutubePrepareRequest,
     YoutubePrepareResponse,
 )
@@ -152,10 +157,112 @@ def probe_audio_duration(path: Path) -> float:
 
 
 def get_youtube_source_path(source_id: uuid.UUID) -> Path | None:
+    preferred_path = youtube_dir / f"{source_id}.mp3"
+    if preferred_path.is_file():
+        return preferred_path
     for path in youtube_dir.glob(f"{source_id}.*"):
-        if path.is_file():
+        if path.is_file() and path.suffix.lower() in {".mp3", ".m4a", ".opus", ".ogg", ".wav", ".webm"}:
             return path
     return None
+
+
+def youtube_metadata_path(source_id: uuid.UUID) -> Path:
+    return youtube_dir / f"{source_id}.json"
+
+
+def get_youtube_source_url(source_id: uuid.UUID) -> str:
+    metadata_path = youtube_metadata_path(source_id)
+    try:
+        source_url = json.loads(metadata_path.read_text(encoding="utf-8"))["url"]
+    except (FileNotFoundError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prepared YouTube video metadata not found. Prepare the video again.",
+        ) from error
+    if not isinstance(source_url, str) or not source_url.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Prepared YouTube video metadata is invalid. Prepare the video again.",
+        )
+    return source_url
+
+
+def delete_youtube_frame_assets(source_id: uuid.UUID, include_previews: bool = True) -> None:
+    patterns = [f"{source_id}.frame.*"]
+    if include_previews:
+        patterns.append(f"{source_id}.preview.*")
+    for pattern in patterns:
+        for path in youtube_dir.glob(pattern):
+            if path.is_file():
+                path.unlink(missing_ok=True)
+
+
+def download_youtube_frame_section(
+    source_id: uuid.UUID,
+    source_url: str,
+    start: float,
+    duration: float,
+) -> Path:
+    delete_youtube_frame_assets(source_id)
+    section_end = start + max(0.5, min(duration, 60))
+    frame_template = youtube_dir / f"{source_id}.frame.%(ext)s"
+    run_process(
+        [
+            sys.executable,
+            "-m",
+            "yt_dlp",
+            "--quiet",
+            "--no-warnings",
+            "--no-playlist",
+            "--download-sections",
+            f"*{start:.3f}-{section_end:.3f}",
+            "--force-keyframes-at-cuts",
+            "--format",
+            "bestvideo[height<=720]/bestvideo/best[height<=720]/best",
+            "--output",
+            str(frame_template),
+            source_url,
+        ],
+        "Could not download the YouTube frame source",
+    )
+
+    frame_sources = [
+        path
+        for path in youtube_dir.glob(f"{source_id}.frame.*")
+        if path.is_file() and path.suffix.lower() not in {".part", ".ytdl"}
+    ]
+    if not frame_sources:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not prepare the YouTube frame")
+    return frame_sources[0]
+
+
+def extract_video_frame(source_path: Path, offset: float, output_path: Path) -> None:
+    run_process(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(source_path),
+            "-ss",
+            f"{max(0, offset):.3f}",
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=640:640:force_original_aspect_ratio=decrease",
+            "-q:v",
+            "3",
+            str(output_path),
+        ],
+        "Could not extract the YouTube frame",
+    )
+
+
+def create_youtube_frame(source_id: uuid.UUID, source_url: str, start: float, output_path: Path) -> None:
+    try:
+        frame_source = download_youtube_frame_section(source_id, source_url, start, 2)
+        extract_video_frame(frame_source, 0, output_path)
+    finally:
+        delete_youtube_frame_assets(source_id, include_previews=False)
 
 
 def delete_youtube_source(source_id: uuid.UUID) -> None:
@@ -490,12 +597,64 @@ def prepare_youtube_audio(
 
     duration = float(info.get("duration") or probe_audio_duration(audio_path))
     title = str(info.get("title") or "YouTube sound")[:80]
+    youtube_metadata_path(source_id).write_text(
+        json.dumps({"url": payload.url.strip()}),
+        encoding="utf-8",
+    )
     return YoutubePrepareResponse(
         source_id=source_id,
         title=title,
         duration=duration,
         audio_url=public_upload_url(audio_path),
     )
+
+
+@app.post("/youtube/frames", response_model=YoutubeFramesResponse)
+def generate_youtube_frames(
+    payload: YoutubeFramesRequest,
+    user: User = Depends(get_current_user),
+) -> YoutubeFramesResponse:
+    _ = user
+    source_path = get_youtube_source_path(payload.source_id)
+    if source_path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prepared YouTube audio not found")
+
+    source_duration = probe_audio_duration(source_path)
+    if payload.start >= source_duration:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Clip start is outside the audio duration")
+    clip_duration = min(payload.duration, source_duration - payload.start)
+    if clip_duration <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Clip duration is too short")
+
+    source_url = get_youtube_source_url(payload.source_id)
+    last_offset = max(0, clip_duration - min(0.15, clip_duration / 10))
+    offsets = [0.0, clip_duration / 3, clip_duration * 2 / 3, last_offset]
+    frames: list[YoutubeFrameOption] = []
+
+    try:
+        frame_source = download_youtube_frame_section(
+            payload.source_id,
+            source_url,
+            payload.start,
+            clip_duration,
+        )
+        for index, offset in enumerate(offsets):
+            preview_path = youtube_dir / f"{payload.source_id}.preview.{index}.jpg"
+            extract_video_frame(frame_source, offset, preview_path)
+            frames.append(
+                YoutubeFrameOption(
+                    index=index,
+                    timestamp=payload.start + offset,
+                    image_url=public_upload_url(preview_path),
+                )
+            )
+    except Exception:
+        delete_youtube_frame_assets(payload.source_id)
+        raise
+    finally:
+        delete_youtube_frame_assets(payload.source_id, include_previews=False)
+
+    return YoutubeFramesResponse(frames=frames)
 
 
 @app.post("/soundboards/{board_id}/sounds/youtube", response_model=SoundRead, status_code=status.HTTP_201_CREATED)
@@ -517,7 +676,8 @@ def add_youtube_clip(
     if clip_duration <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Clip duration is too short")
 
-    filename = f"{uuid.uuid4()}.mp3"
+    file_id = uuid.uuid4()
+    filename = f"{file_id}.mp3"
     output_path = settings.upload_dir / filename
     run_process(
         [
@@ -539,11 +699,37 @@ def add_youtube_clip(
         "Could not create YouTube clip",
     )
 
+    image_url = str(payload.image_url) if payload.image_url else None
+    image_path: Path | None = None
+    if image_url is None:
+        image_path = settings.upload_dir / f"{file_id}.jpg"
+        try:
+            if payload.frame_index is not None:
+                preview_path = youtube_dir / f"{payload.source_id}.preview.{payload.frame_index}.jpg"
+                if not preview_path.is_file():
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Selected YouTube frame not found. Generate the frame options again.",
+                    )
+                shutil.copyfile(preview_path, image_path)
+            else:
+                create_youtube_frame(
+                    payload.source_id,
+                    get_youtube_source_url(payload.source_id),
+                    payload.start,
+                    image_path,
+                )
+            image_url = public_upload_url(image_path)
+        except Exception:
+            output_path.unlink(missing_ok=True)
+            image_path.unlink(missing_ok=True)
+            raise
+
     sound = Sound(
         soundboard_id=board_id,
         title=payload.title.strip(),
         file_url=public_upload_url(output_path),
-        image_url=str(payload.image_url) if payload.image_url else None,
+        image_url=image_url,
         hotkey=payload.hotkey.upper() if payload.hotkey else None,
         order=next_order(board_id, db),
     )

@@ -96,10 +96,27 @@ class YoutubePrepareResponse(BaseModel):
     audio_url: str
 
 
+class YoutubeFramesRequest(BaseModel):
+    source_id: uuid.UUID
+    start: float = Field(ge=0)
+    duration: float = Field(gt=0, le=60)
+
+
+class YoutubeFrameOption(BaseModel):
+    index: int
+    timestamp: float
+    image_url: str
+
+
+class YoutubeFramesResponse(BaseModel):
+    frames: list[YoutubeFrameOption]
+
+
 class YoutubeClipRequest(BaseModel):
     source_id: uuid.UUID
     title: str = Field(min_length=1, max_length=80)
     start: float = Field(ge=0)
     duration: float = Field(gt=0, le=60)
     image_url: HttpUrl | None = None
+    frame_index: int | None = Field(default=None, ge=0, le=3)
     hotkey: str | None = Field(default=None, max_length=1)

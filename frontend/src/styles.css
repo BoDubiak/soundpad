@@ -189,7 +189,6 @@ button:disabled {
 
 .icon-button,
 .share-button,
-.visibility-button,
 .primary-button,
 .delete-button,
 .segmented button {
@@ -203,8 +202,7 @@ button:disabled {
 }
 
 .icon-button,
-.share-button,
-.visibility-button {
+.share-button {
   background: #15212a;
   color: #fff;
   padding: 0 14px;
@@ -215,11 +213,25 @@ button:disabled {
   color: #15212a;
 }
 
-.visibility-button.public {
+.visibility-status {
+  align-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 7px;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 13px;
+  white-space: nowrap;
+}
+
+.visibility-status.public {
   background: #2e8f73;
 }
 
-.visibility-button.private {
+.visibility-status.private {
   background: #6a7780;
 }
 
@@ -550,6 +562,22 @@ button:disabled {
   padding: 0 14px;
 }
 
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.button-spinner {
+  animation: button-spin 0.8s linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .youtube-clip-panel {
   border: 1px solid #dfe5e8;
   border-radius: 8px;
@@ -592,6 +620,47 @@ button:disabled {
   display: grid;
   gap: 8px;
   grid-template-columns: 1fr 1fr auto;
+}
+
+.youtube-frame-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.youtube-frame-option {
+  background: #ffffff;
+  border: 2px solid transparent;
+  border-radius: 9px;
+  color: #30414d;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px;
+  text-align: left;
+}
+
+.youtube-frame-option:hover {
+  border-color: #aebdc4;
+}
+
+.youtube-frame-option.selected {
+  border-color: #ffbf3f;
+  box-shadow: 0 0 0 3px rgba(255, 191, 63, 0.2);
+}
+
+.youtube-frame-option img {
+  aspect-ratio: 16 / 9;
+  border-radius: 5px;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.youtube-frame-option span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0 3px 2px;
 }
 
 .icon-text-button {
@@ -650,18 +719,54 @@ button:disabled {
 }
 
 .board-area {
+  background: #eef2ef;
+  border: 1px solid #d7e0dc;
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(16, 24, 29, 0.06);
   min-width: 0;
+  padding: 18px;
 }
 
 .board-area-heading {
+  align-items: center;
+  border-bottom: 1px solid #d2dcd7;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
   margin-bottom: 18px;
+  padding-bottom: 18px;
+}
+
+.board-heading-identity {
+  align-items: center;
+  display: flex;
+  gap: clamp(14px, 2vw, 22px);
+  min-width: 0;
+}
+
+.board-area-actions {
+  align-items: stretch;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  min-width: 118px;
+}
+
+.board-area-actions > * {
+  width: 100%;
 }
 
 .board-area-heading .title-display {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  display: -webkit-box;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  max-height: clamp(96px, 10vw, 124px);
   min-width: 0;
   overflow: hidden;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .board-area-heading .title-display.long-title {
@@ -694,7 +799,9 @@ button:disabled {
   gap: 6px;
 }
 
-.board-settings-panel input {
+.board-settings-panel input,
+.board-settings-panel select {
+  background: #ffffff;
   border: 1px solid #ced8de;
   border-radius: 8px;
   color: #111a20;
@@ -702,7 +809,8 @@ button:disabled {
   padding: 0 11px;
 }
 
-.board-settings-panel input:focus {
+.board-settings-panel input:focus,
+.board-settings-panel select:focus {
   border-color: #2e8f73;
   outline: 3px solid rgba(46, 143, 115, 0.14);
 }
@@ -972,6 +1080,26 @@ kbd {
 
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .board-area {
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .board-area-heading {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+  }
+
+  .board-area-heading .title-display {
+    max-height: 72px;
+  }
+
+  .board-area-actions {
+    min-width: 0;
   }
 
   .clip-row {
