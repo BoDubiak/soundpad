@@ -185,6 +185,11 @@ def youtube_download_command_args() -> list[str]:
 def youtube_download_error_detail(error: Exception) -> str:
     message = str(error)
     if "Sign in to confirm you’re not a bot" in message or "Sign in to confirm you're not a bot" in message:
+        if settings.youtube_po_token_provider_url:
+            return (
+                "YouTube rejected the request even though the automatic token provider is enabled. "
+                "The server IP may be temporarily restricted; check the backend and pot-provider logs."
+            )
         if not settings.youtube_cookies_file and not settings.youtube_cookies_from_browser:
             return (
                 "YouTube requires authentication for this request. Configure YOUTUBE_COOKIES_FILE "

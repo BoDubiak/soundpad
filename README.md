@@ -52,7 +52,8 @@ Prepared YouTube source files are deleted after a clip is created. Abandoned sou
 
 The production Docker stack runs a private `bgutil` PO Token Provider and configures `yt-dlp` to request fresh
 tokens automatically. No manual token or cookie setup is required for ordinary public videos. The provider is
-only reachable inside the Compose network.
+only reachable inside the Compose network. The backend image also includes Node.js, `yt-dlp-ejs`, and browser
+impersonation support for YouTube's JavaScript challenges.
 
 Cookies remain an optional fallback for age-restricted or account-only videos. Export fresh YouTube cookies in
 Netscape `cookies.txt` format and set `YOUTUBE_COOKIES_FILE` in `backend/.env`. For local development, you can
