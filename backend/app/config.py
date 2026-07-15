@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     youtube_cookies_file: str | None = None
     youtube_cookies_from_browser: str | None = None
     youtube_po_token_provider_url: str | None = None
+    youtube_proxy_url: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

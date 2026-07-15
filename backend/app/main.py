@@ -142,6 +142,10 @@ def youtube_download_options() -> dict[str, object]:
     if deno_path:
         options["js_runtimes"] = {"deno": {"path": deno_path}}
 
+    proxy_url = (settings.youtube_proxy_url or "").strip()
+    if proxy_url:
+        options["proxy"] = proxy_url
+
     provider_url = (settings.youtube_po_token_provider_url or "").strip().rstrip("/")
     if provider_url:
         options["extractor_args"] = {
@@ -173,6 +177,10 @@ def youtube_download_command_args() -> list[str]:
     if deno_path:
         args.extend(["--js-runtimes", f"deno:{deno_path}"])
 
+    proxy_url = (settings.youtube_proxy_url or "").strip()
+    if proxy_url:
+        args.extend(["--proxy", proxy_url])
+
     provider_url = (settings.youtube_po_token_provider_url or "").strip().rstrip("/")
     if provider_url:
         args.extend(["--extractor-args", "youtube:player_client=mweb"])
@@ -196,7 +204,7 @@ def youtube_download_error_detail(error: Exception) -> str:
         if settings.youtube_po_token_provider_url:
             return (
                 "YouTube rejected the request even though the automatic token provider is enabled. "
-                "The server IP may be temporarily restricted; check the backend and pot-provider logs."
+                "The configured proxy or server IP may be restricted; check the backend and pot-provider logs."
             )
         if not settings.youtube_cookies_file and not settings.youtube_cookies_from_browser:
             return (

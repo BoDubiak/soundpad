@@ -33,6 +33,7 @@ services:
       YOUTUBE_TEMP_TTL_HOURS: ${YOUTUBE_TEMP_TTL_HOURS:-24}
       YOUTUBE_COOKIES_FILE: ${YOUTUBE_COOKIES_FILE:-}
       YOUTUBE_PO_TOKEN_PROVIDER_URL: http://pot-provider:4416
+      YOUTUBE_PROXY_URL: ${YOUTUBE_PROXY_URL:-}
     volumes:
       - uploads:/app/uploads
     depends_on:

@@ -60,6 +60,10 @@ Netscape `cookies.txt` format and set `YOUTUBE_COOKIES_FILE` in `backend/.env`. 
 instead set `YOUTUBE_COOKIES_FROM_BROWSER=chrome` (or `edge`/`firefox`) to read cookies from a browser on the
 backend machine. Stop the browser first if its cookie database is locked, and never commit the cookie file.
 
+If YouTube restricts the VPS data-center IP even with valid PO tokens, set `YOUTUBE_PROXY_URL` in
+`.env.production` to an HTTP(S) or SOCKS proxy URL. The backend applies it automatically to audio and frame
+downloads. Treat proxy credentials as secrets and never commit them.
+
 ## GitHub
 
 Commit source code and examples:
