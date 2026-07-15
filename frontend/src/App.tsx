@@ -1005,7 +1005,7 @@ export function App() {
                             setYoutubeFrames([]);
                             setSelectedYoutubeFrame(null);
                           }}
-                          step={0.1}
+                          step={0.01}
                           type="range"
                           value={clipStart}
                         />
@@ -1020,7 +1020,7 @@ export function App() {
                             setYoutubeFrames([]);
                             setSelectedYoutubeFrame(null);
                           }}
-                          step={0.1}
+                          step={0.01}
                           type="range"
                           value={clipDuration}
                         />
@@ -1035,7 +1035,7 @@ export function App() {
                             setYoutubeFrames([]);
                             setSelectedYoutubeFrame(null);
                           }}
-                          step={0.1}
+                          step={0.01}
                           type="number"
                           value={clipStart}
                         />
@@ -1048,7 +1048,7 @@ export function App() {
                             setYoutubeFrames([]);
                             setSelectedYoutubeFrame(null);
                           }}
-                          step={0.1}
+                          step={0.01}
                           type="number"
                           value={clipDuration}
                         />
@@ -1200,11 +1200,11 @@ export function App() {
 }
 
 function formatSeconds(value: number) {
-  const safeValue = Math.max(0, value);
-  const minutes = Math.floor(safeValue / 60);
-  const seconds = Math.floor(safeValue % 60);
-  const tenths = Math.floor((safeValue % 1) * 10);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}.${tenths}`;
+  const totalCentiseconds = Math.round(Math.max(0, value) * 100);
+  const minutes = Math.floor(totalCentiseconds / 6000);
+  const seconds = Math.floor((totalCentiseconds % 6000) / 100);
+  const centiseconds = totalCentiseconds % 100;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}.${centiseconds.toString().padStart(2, "0")}`;
 }
 
 function PublicBoard({
