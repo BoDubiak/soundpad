@@ -277,14 +277,8 @@ def delete_youtube_frame_assets(source_id: uuid.UUID, include_previews: bool = T
                 path.unlink(missing_ok=True)
 
 
-def download_youtube_frame_section(
-    source_id: uuid.UUID,
-    source_url: str,
-    start: float,
-    duration: float,
-) -> Path:
+def download_youtube_frame_source(source_id: uuid.UUID, source_url: str) -> Path:
     delete_youtube_frame_assets(source_id)
-    section_end = start + max(0.5, min(duration, 60))
     frame_template = youtube_dir / f"{source_id}.frame.%(ext)s"
     run_process(
         [
@@ -294,11 +288,8 @@ def download_youtube_frame_section(
             "--quiet",
             "--no-warnings",
             "--no-playlist",
-            "--download-sections",
-            f"*{start:.3f}-{section_end:.3f}",
-            "--force-keyframes-at-cuts",
             "--format",
-            "bestvideo[height<=720]/bestvideo/best[height<=720]/best",
+            "bestvideo[height<=360]/best[height<=360]/worstvideo/worst",
             "--output",
             str(frame_template),
             *youtube_download_command_args(),
@@ -322,10 +313,10 @@ def extract_video_frame(source_path: Path, offset: float, output_path: Path) -> 
         [
             "ffmpeg",
             "-y",
-            "-i",
-            str(source_path),
             "-ss",
             f"{max(0, offset):.3f}",
+            "-i",
+            str(source_path),
             "-frames:v",
             "1",
             "-vf",
@@ -340,8 +331,8 @@ def extract_video_frame(source_path: Path, offset: float, output_path: Path) -> 
 
 def create_youtube_frame(source_id: uuid.UUID, source_url: str, start: float, output_path: Path) -> None:
     try:
-        frame_source = download_youtube_frame_section(source_id, source_url, start, 2)
-        extract_video_frame(frame_source, 0, output_path)
+        frame_source = download_youtube_frame_source(source_id, source_url)
+        extract_video_frame(frame_source, start, output_path)
     finally:
         delete_youtube_frame_assets(source_id, include_previews=False)
 
@@ -718,15 +709,10 @@ def generate_youtube_frames(
     frames: list[YoutubeFrameOption] = []
 
     try:
-        frame_source = download_youtube_frame_section(
-            payload.source_id,
-            source_url,
-            payload.start,
-            clip_duration,
-        )
+        frame_source = download_youtube_frame_source(payload.source_id, source_url)
         for index, offset in enumerate(offsets):
             preview_path = youtube_dir / f"{payload.source_id}.preview.{index}.jpg"
-            extract_video_frame(frame_source, offset, preview_path)
+            extract_video_frame(frame_source, payload.start + offset, preview_path)
             frames.append(
                 YoutubeFrameOption(
                     index=index,
