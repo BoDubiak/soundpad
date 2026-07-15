@@ -138,6 +138,10 @@ def run_process(command: list[str], failure_detail: str) -> subprocess.Completed
 
 def youtube_download_options() -> dict[str, object]:
     options: dict[str, object] = {}
+    deno_path = shutil.which("deno")
+    if deno_path:
+        options["js_runtimes"] = {"deno": {"path": deno_path}}
+
     provider_url = (settings.youtube_po_token_provider_url or "").strip().rstrip("/")
     if provider_url:
         options["extractor_args"] = {
@@ -165,6 +169,10 @@ def youtube_download_options() -> dict[str, object]:
 def youtube_download_command_args() -> list[str]:
     options = youtube_download_options()
     args: list[str] = []
+    deno_path = shutil.which("deno")
+    if deno_path:
+        args.extend(["--js-runtimes", f"deno:{deno_path}"])
+
     provider_url = (settings.youtube_po_token_provider_url or "").strip().rstrip("/")
     if provider_url:
         args.extend(["--extractor-args", "youtube:player_client=mweb"])
