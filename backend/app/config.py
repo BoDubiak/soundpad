@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     refresh_cookie_name: str = "soundpad_refresh_token"
     secure_cookies: bool = False
     youtube_temp_ttl_hours: int = 24
+    youtube_cookies_file: str | None = None
+    youtube_cookies_from_browser: str | None = None
+    youtube_po_token_provider_url: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

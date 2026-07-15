@@ -4,6 +4,8 @@
 backend/.env
 frontend/.env
 *.local
+secrets/
+cookies.txt
 
 # Python
 backend/.venv/

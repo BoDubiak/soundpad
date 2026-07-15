@@ -136,6 +136,65 @@ def run_process(command: list[str], failure_detail: str) -> subprocess.Completed
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from error
 
 
+def youtube_download_options() -> dict[str, object]:
+    options: dict[str, object] = {}
+    provider_url = (settings.youtube_po_token_provider_url or "").strip().rstrip("/")
+    if provider_url:
+        options["extractor_args"] = {
+            "youtube": {"player_client": ["mweb"]},
+            "youtubepot-bgutilhttp": {"base_url": [provider_url]},
+        }
+
+    cookie_file_setting = (settings.youtube_cookies_file or "").strip()
+    if cookie_file_setting:
+        cookie_file = Path(cookie_file_setting).expanduser()
+        if not cookie_file.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"The configured YouTube cookies file does not exist: {cookie_file}",
+            )
+        options["cookiefile"] = str(cookie_file)
+        return options
+
+    browser = (settings.youtube_cookies_from_browser or "").strip()
+    if browser:
+        options["cookiesfrombrowser"] = (browser,)
+    return options
+
+
+def youtube_download_command_args() -> list[str]:
+    options = youtube_download_options()
+    args: list[str] = []
+    provider_url = (settings.youtube_po_token_provider_url or "").strip().rstrip("/")
+    if provider_url:
+        args.extend(["--extractor-args", "youtube:player_client=mweb"])
+        args.extend(
+            [
+                "--extractor-args",
+                f"youtubepot-bgutilhttp:base_url={provider_url}",
+            ]
+        )
+    if "cookiefile" in options:
+        args.extend(["--cookies", str(options["cookiefile"])])
+    elif "cookiesfrombrowser" in options:
+        browser = str(options["cookiesfrombrowser"][0])
+        args.extend(["--cookies-from-browser", browser])
+    return args
+
+
+def youtube_download_error_detail(error: Exception) -> str:
+    message = str(error)
+    if "Sign in to confirm you’re not a bot" in message or "Sign in to confirm you're not a bot" in message:
+        if not settings.youtube_cookies_file and not settings.youtube_cookies_from_browser:
+            return (
+                "YouTube requires authentication for this request. Configure YOUTUBE_COOKIES_FILE "
+                "with an exported Netscape cookies.txt file, or set YOUTUBE_COOKIES_FROM_BROWSER "
+                "for a browser on the backend host."
+            )
+        return "YouTube rejected the configured cookies. Export a fresh cookies.txt file and try again."
+    return f"Could not download YouTube audio: {message}"
+
+
 def probe_audio_duration(path: Path) -> float:
     result = run_process(
         [
@@ -221,6 +280,7 @@ def download_youtube_frame_section(
             "bestvideo[height<=720]/bestvideo/best[height<=720]/best",
             "--output",
             str(frame_template),
+            *youtube_download_command_args(),
             source_url,
         ],
         "Could not download the YouTube frame source",
@@ -566,6 +626,7 @@ def prepare_youtube_audio(
 
     source_id = uuid.uuid4()
     output_template = str(youtube_dir / f"{source_id}.%(ext)s")
+    download_options = youtube_download_options()
     try:
         with YoutubeDL(
             {
@@ -574,6 +635,7 @@ def prepare_youtube_audio(
                 "outtmpl": output_template,
                 "quiet": True,
                 "no_warnings": True,
+                **download_options,
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
@@ -586,7 +648,10 @@ def prepare_youtube_audio(
             info = downloader.extract_info(payload.url.strip(), download=True)
     except Exception as error:
         delete_youtube_source(source_id)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Could not download YouTube audio: {error}") from error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=youtube_download_error_detail(error),
+        ) from error
 
     audio_path = youtube_dir / f"{source_id}.mp3"
     if not audio_path.exists():

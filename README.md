@@ -50,6 +50,15 @@ For YouTube clips, install `ffmpeg` and make sure `ffmpeg`/`ffprobe` are availab
 Prepared YouTube source files are deleted after a clip is created. Abandoned source files are removed after
 `YOUTUBE_TEMP_TTL_HOURS` hours (24 by default) on backend startup, hourly, and before each new YouTube preparation.
 
+The production Docker stack runs a private `bgutil` PO Token Provider and configures `yt-dlp` to request fresh
+tokens automatically. No manual token or cookie setup is required for ordinary public videos. The provider is
+only reachable inside the Compose network.
+
+Cookies remain an optional fallback for age-restricted or account-only videos. Export fresh YouTube cookies in
+Netscape `cookies.txt` format and set `YOUTUBE_COOKIES_FILE` in `backend/.env`. For local development, you can
+instead set `YOUTUBE_COOKIES_FROM_BROWSER=chrome` (or `edge`/`firefox`) to read cookies from a browser on the
+backend machine. Stop the browser first if its cookie database is locked, and never commit the cookie file.
+
 ## GitHub
 
 Commit source code and examples:
